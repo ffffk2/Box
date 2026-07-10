@@ -1,0 +1,47 @@
+name: Build TVBox APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Remove python/chaquopy blockers (normal flavor only)
+        run: |
+          sed -i "/include ':pyramid'/d" settings.gradle
+          sed -i '/pythonImplementation project/d' app/build.gradle
+          sed -i '/com.chaquo.python:gradle/d' build.gradle
+          # use official gradle distribution (faster from US cloud than tencent mirror)
+          sed -i 's|https://mirrors.cloud.tencent.com/gradle/|https://services.gradle.org/distributions/|' gradle/wrapper/gradle-wrapper.properties
+          cat settings.gradle
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0'
+
+      - name: Write local.properties
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+
+      - name: Build arm64 generic normal debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleArm64GenericNormalDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tvbox-arm64-debug
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
