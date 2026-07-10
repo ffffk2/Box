@@ -155,6 +155,38 @@ public class ApiConfig {
             }
         }
         String TempKey = null, configUrl = "", pk = ";pk;";
+        // Support assets:// protocol for bundled source configs
+        if (apiUrl.startsWith("assets://")) {
+            try {
+                String assetPath = apiUrl.substring(9);
+                InputStream is = App.getInstance().getAssets().open(assetPath);
+                byte[] data = new byte[is.available()];
+                is.read(data);
+                is.close();
+                String json = new String(data, "UTF-8");
+                parseJson(apiUrl, json);
+                // Save to cache
+                try {
+                    File cacheDir = cache.getParentFile();
+                    if (!cacheDir.exists())
+                        cacheDir.mkdirs();
+                    if (cache.exists())
+                        cache.delete();
+                    FileOutputStream fos = new FileOutputStream(cache);
+                    fos.write(json.getBytes("UTF-8"));
+                    fos.flush();
+                    fos.close();
+                } catch (Throwable th) {
+                    th.printStackTrace();
+                }
+                callback.success();
+                return;
+            } catch (Throwable th) {
+                th.printStackTrace();
+                callback.error("读取本地配置失败");
+                return;
+            }
+        }
         if (apiUrl.contains(pk)) {
             String[] a = apiUrl.split(pk);
             TempKey = a[1];
